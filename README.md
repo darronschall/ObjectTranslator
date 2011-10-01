@@ -10,32 +10,32 @@ Usage
 
 Usage is as follows:
 
-  import com.darronschall.examples.vo.Book;
-  import com.darronschall.serialization.ObjectTranslator;
+    import com.darronschall.examples.vo.Book;
+    import com.darronschall.serialization.ObjectTranslator;
 
-  // Define an object with properties that mimic the variable names
-  // inside of the Book class
-  var bookObj:Object = { title: "My Book title", pageCount: 10, inLibrary: true };
+    // Define an object with properties that mimic the variable names
+    // inside of the Book class
+    var bookObj:Object = { title: "My Book title", pageCount: 10, inLibrary: true };
 
-  // Convert the generic object into an instance of the Book class
-  var book:Book = ObjectTranslator.objectToInstance( bookObj, Book ) as Book;
+    // Convert the generic object into an instance of the Book class
+    var book:Book = ObjectTranslator.objectToInstance( bookObj, Book ) as Book;
 
 Limitations
 -----
 
-The code is not yet recursive (feel free to fork and add that!).  If you have nested value objects that you're converting to class instances, you'll have to manually go through the object graph:
+The code is not yet recursive (feel free to fork, implement, and submit a pull request!).  If you have nested value objects that you're converting to class instances, you'll have to manually go through the object graph:
 
-  import com.darronschall.examples.vo.Book;
-  import com.darronschall.examples.vo.Student;
-  import com.darronschall.serialization.ObjectTranslator;
+    import com.darronschall.examples.vo.Book;
+    import com.darronschall.examples.vo.Student;
+    import com.darronschall.serialization.ObjectTranslator;
 
-  var studentObj:Object = { firstName: "test first",
+    var studentObj:Object = { firstName: "test first",
   				  lastName: "test last",
 					  favoriteBook: { title: "Favorite Book!" }
 					};	
 								
-  // First we need to convert the nested objects to classes
-  studentObj.favoriteBook = ObjectTranslator.objectToInstance( studentObj.favoriteBook, Book );
+    // First we need to convert the nested objects to classes
+    studentObj.favoriteBook = ObjectTranslator.objectToInstance( studentObj.favoriteBook, Book );
 		
-  // Convert the student object to a Student class
-  var student:Student = ObjectTranslator.objectToInstance( studentObj, Student ) as Student;
+    // Convert the student object to a Student class
+    var student:Student = ObjectTranslator.objectToInstance( studentObj, Student ) as Student;
