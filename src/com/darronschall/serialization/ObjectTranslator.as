@@ -36,6 +36,29 @@ import flash.utils.getDefinitionByName;
  */
 public final class ObjectTranslator
 {
+	/**
+	 * Returns whether or not the given object is simple data type.
+	 *
+	 * @param the object to check
+	 * @return true if the given object is a simple data type; false if not
+	 */
+	public static function isSimple(object:Object):Boolean 
+	{
+		if(!object)
+			return true;
+		
+		switch (typeof(object)) 
+		{
+			case "number":
+			case "string":
+			case "boolean":
+				return true;
+			case "object":
+				return (object is Date) || (object is Array);
+		}
+		
+		return false;
+	}
 	
 	/**
 	 * Converts a plain vanilla object to be an instance of the class
@@ -56,30 +79,69 @@ public final class ObjectTranslator
 	 */
 	public static function objectToInstance( object:Object, clazz:Class ):*
 	{
-		var bytes:ByteArray = new ByteArray();
-		bytes.objectEncoding = ObjectEncoding.AMF0;
+		// Resolve accessors and clazz information
+		// Register all of the classes so they can be decoded via AMF
+		var typeInfo:XML = describeType(clazz);
+		var fullyQualifiedName:String = typeInfo.@name.toString().replace(/::/, ".");
+		
+		
+		//Recursively resolve internal complex classes first
+		var accessors : XMLList = typeInfo..accessor.(@access == "readwrite");
+		var isComplex : Boolean;
+		var complexClazz : Class;
+		var complexClazzFullyQualifiedName : String;
+		var arrayElementType : String;
+		for each(var accessor : XML in accessors)
+		{
+			isComplex = !isSimple(object[accessor.@name]);
+			
+			if(isComplex)
+			{
+				complexClazzFullyQualifiedName = accessor.@type.toString().replace(/::/, ".");
+				complexClazz = getDefinitionByName(complexClazzFullyQualifiedName) as Class;
+				registerClassAlias(complexClazzFullyQualifiedName, complexClazz);
+				object[accessor.@name] = objectToInstance(object[accessor.@name], complexClazz);
+			}
+			else
+			{
+				var typeNode : XMLList = accessor.metadata.(@name=='ArrayElementType');
+				
+				arrayElementType = typeNode.arg.(@key == "").@value;
+				if(arrayElementType!='')
+				{
+					var objArray : Array = object[accessor.@name]; 
+					var resultArray : Array = [];
+					for each(var elem : Object in objArray)
+					{
+						complexClazz = getDefinitionByName(arrayElementType) as Class;
+						resultArray.push(objectToInstance(elem, complexClazz));
+					}
+					
+					object[accessor.@name] = resultArray;
+				}
+			}
+		}
 		
 		// Find the objects and byetArray.writeObject them, adding in the
 		// class configuration variable name -- essentially, we're constructing
 		// and AMF packet here that contains the class information so that
-		// we can simplly byteArray.readObject the sucker for the translation
+		// we can simply byteArray.readObject the sucker for the translation
+		
+		var bytes:ByteArray = new ByteArray();
+		bytes.objectEncoding = ObjectEncoding.AMF0;
 		
 		// Write out the bytes of the original object
 		var objBytes:ByteArray = new ByteArray();
 		objBytes.objectEncoding = ObjectEncoding.AMF0;
-		objBytes.writeObject( object );
-				
-		// Register all of the classes so they can be decoded via AMF
-		var typeInfo:XML = describeType( clazz );
-		var fullyQualifiedName:String = typeInfo.@name.toString().replace( /::/, "." );
-		registerClassAlias( fullyQualifiedName, clazz );
+		objBytes.writeObject(object);
+		registerClassAlias(fullyQualifiedName, clazz);
 		
 		// Write the new object information starting with the class information
 		var len:int = fullyQualifiedName.length;
-		bytes.writeByte( 0x10 );  // 0x10 is AMF0 for "typed object (class instance)"
-		bytes.writeUTF( fullyQualifiedName );
+		bytes.writeByte(0x10); // 0x10 is AMF0 for "typed object (class instance)"
+		bytes.writeUTF(fullyQualifiedName);
 		// After the class name is set up, write the rest of the object
-		bytes.writeBytes( objBytes, 1 );
+		bytes.writeBytes(objBytes, 1);
 		
 		// Read in the object with the class property added and return that
 		bytes.position = 0;
